@@ -1,0 +1,36 @@
+{
+  "name": "wcag-auditor",
+  "version": "1.0.0",
+  "description": "Audit WCAG compliance for websites discovered via Google Places API",
+  "main": "src/index.js",
+  "bin": {
+    "wcag-auditor": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "audit": "node src/index.js"
+  },
+  "dependencies": {
+    "@axe-core/puppeteer": "^4.9.1",
+    "axios": "^1.6.0",
+    "chrome-launcher": "^1.1.2",
+    "commander": "^11.1.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "lighthouse": "^11.4.0",
+    "nodemailer": "^6.9.0",
+    "pdfkit": "^0.14.0",
+    "puppeteer": "^24.43.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "wcag",
+    "accessibility",
+    "lighthouse",
+    "axe-core",
+    "audit"
+  ],
+  "license": "MIT"
+}

@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WCAG Auditor</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:   #1a365d;
+    --blue:   #2b6cb0;
+    --accent: #3182ce;
+    --green:  #276749;
+    --red:    #c53030;
+    --orange: #c05621;
+    --amber:  #b7791f;
+    --bg:     #f0f4f8;
+    --card:   #ffffff;
+    --border: #e2e8f0;
+    --text:   #1a202c;
+    --muted:  #718096;
+  }
+
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ── Header ── */
+  header { background: var(--navy); color: #fff; padding: 0 32px;
+           display: flex; align-items: center; height: 60px; gap: 16px; }
+  header h1 { font-size: 18px; font-weight: 700; letter-spacing: -.3px; }
+  header span { font-size: 12px; color: #90cdf4; background: rgba(255,255,255,.1);
+                padding: 2px 8px; border-radius: 999px; }
+
+  /* ── Layout ── */
+  .layout { display: grid; grid-template-columns: 280px 1fr; min-height: calc(100vh - 60px); }
+
+  /* ── Sidebar ── */
+  aside { background: var(--card); border-right: 1px solid var(--border);
+          padding: 24px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .nav-btn { display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+             border-radius: 8px; border: none; background: none; cursor: pointer;
+             font-size: 14px; color: var(--muted); width: 100%; text-align: left;
+             transition: all .15s; }
+  .nav-btn:hover { background: var(--bg); color: var(--text); }
+  .nav-btn.active { background: #ebf8ff; color: var(--accent); font-weight: 600; }
+  .nav-btn .icon { font-size: 18px; width: 24px; text-align: center; }
+
+  /* ── Main ── */
+  main { padding: 32px; overflow-y: auto; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── Cards ── */
+  .card { background: var(--card); border: 1px solid var(--border);
+          border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+  .card-title { font-size: 16px; font-weight: 700; margin-bottom: 16px;
+                color: var(--navy); display: flex; align-items: center; gap: 8px; }
+
+  /* ── Form ── */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+  label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  input, select { border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 12px;
+                  font-size: 14px; color: var(--text); outline: none; transition: border .15s;
+                  background: var(--card); }
+  input:focus, select:focus { border-color: var(--accent); }
+
+  /* ── Buttons ── */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px;
+         border-radius: 8px; border: none; cursor: pointer; font-size: 14px;
+         font-weight: 600; transition: all .15s; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--blue); }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--text); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-ghost { background: transparent; border: none; color: var(--accent); text-decoration: underline;
+               padding: 0; font-size: 13px; cursor: pointer; }
+
+  /* ── Progress bar ── */
+  .progress-wrap { margin-top: 20px; display: none; }
+  .progress-wrap.visible { display: block; }
+  .progress-info { display: flex; justify-content: space-between; font-size: 13px;
+                   color: var(--muted); margin-bottom: 8px; }
+  .progress-bar-bg { height: 8px; background: var(--border); border-radius: 999px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; background: var(--accent); border-radius: 999px;
+                       transition: width .4s ease; }
+  .progress-current { font-size: 13px; color: var(--muted); margin-top: 8px; }
+
+  /* ── Results table ── */
+  .results-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .filter-row { display: flex; gap: 8px; }
+  .filter-btn { padding: 6px 14px; border-radius: 999px; border: 1.5px solid var(--border);
+                background: var(--card); font-size: 12px; font-weight: 600; cursor: pointer;
+                color: var(--muted); transition: all .15s; }
+  .filter-btn.active { border-color: var(--accent); color: var(--accent); background: #ebf8ff; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 12px; font-size: 11px; font-weight: 700;
+       color: var(--muted); text-transform: uppercase; letter-spacing: .5px;
+       border-bottom: 2px solid var(--border); }
+  td { padding: 12px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:hover td { background: var(--bg); }
+  tr:last-child td { border-bottom: none; }
+  .firm-name { font-weight: 600; color: var(--text); }
+  .firm-url  { font-size: 11px; color: var(--muted); }
+
+  /* ── Score badge ── */
+  .score { display: inline-flex; align-items: center; justify-content: center;
+           width: 44px; height: 44px; border-radius: 50%; font-weight: 800;
+           font-size: 14px; color: #fff; }
+  .score.critical { background: var(--red); }
+  .score.poor     { background: var(--orange); }
+  .score.moderate { background: var(--amber); }
+  .score.good     { background: var(--green); }
+  .score.error    { background: var(--muted); font-size: 11px; }
+
+  /* ── Status pill ── */
+  .pill { display: inline-block; padding: 3px 10px; border-radius: 999px;
+          font-size: 11px; font-weight: 700; text-transform: uppercase; }
+  .pill.pass   { background: #f0fff4; color: var(--green); }
+  .pill.fail   { background: #fff5f5; color: var(--red); }
+  .pill.cached { background: #ebf8ff; color: var(--blue); }
+  .pill.error  { background: #fefcbf; color: var(--amber); }
+
+  /* ── Empty state ── */
+  .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty .icon { font-size: 48px; margin-bottom: 12px; }
+  .empty p { font-size: 14px; }
+
+  /* ── Modal ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5);
+                   display: none; align-items: center; justify-content: center; z-index: 1000; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--card); border-radius: 16px; width: 620px; max-width: 95vw;
+           max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+  .modal-header { padding: 20px 24px; border-bottom: 1px solid var(--border);
+                  display: flex; justify-content: space-between; align-items: center; }
+  .modal-header h2 { font-size: 16px; font-weight: 700; }
+  .modal-close { background: none; border: none; font-size: 22px; cursor: pointer;
+                 color: var(--muted); line-height: 1; }
+  .modal-body { padding: 24px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 16px; }
+  .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border);
+                  display: flex; justify-content: flex-end; gap: 10px; }
+  textarea { border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 12px;
+             font-size: 13px; line-height: 1.6; font-family: inherit; resize: vertical;
+             outline: none; transition: border .15s; }
+  textarea:focus { border-color: var(--accent); }
+  .to-field { display: flex; align-items: center; gap: 10px; }
+  .to-field input { flex: 1; }
+
+  /* ── Toast ── */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--navy); color: #fff;
+           padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 600;
+           opacity: 0; transform: translateY(8px); transition: all .3s; pointer-events: none;
+           z-index: 9999; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.error { background: var(--red); }
+
+  /* ── Audit mode tabs ── */
+  .mode-tabs { display: flex; gap: 0; margin-bottom: 20px; border: 1.5px solid var(--border);
+               border-radius: 8px; overflow: hidden; }
+  .mode-tab  { flex: 1; padding: 9px 16px; font-size: 13px; font-weight: 600; border: none;
+               background: var(--card); color: var(--muted); cursor: pointer; transition: all .15s; }
+  .mode-tab.active  { background: var(--accent); color: #fff; }
+  .mode-tab:hover:not(.active) { background: var(--bg); color: var(--text); }
+
+  /* ── Single URL result ── */
+  .url-result { border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden; margin-top: 16px; }
+  .url-result-header { background: var(--navy); color: #fff; padding: 12px 18px;
+                       display: flex; align-items: center; gap: 12px; }
+  .url-result-body   { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+  .url-score-circle  { width: 56px; height: 56px; border-radius: 50%; display: flex;
+                       align-items: center; justify-content: center; flex-shrink: 0;
+                       font-size: 20px; font-weight: 800; color: #fff; }
+
+  /* ── Stats row ── */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+               padding: 16px 20px; }
+  .stat-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+                letter-spacing: .5px; margin-bottom: 6px; }
+  .stat-value { font-size: 28px; font-weight: 800; color: var(--navy); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ WCAG Auditor</h1>
+  <span>Lighthouse + axe-core</span>
+</header>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <aside>
+    <button class="nav-btn active" onclick="showPage('audit', this)">
+      <span class="icon">🔍</span> New Audit
+    </button>
+    <button class="nav-btn" onclick="showPage('results', this)">
+      <span class="icon">📊</span> Results
+    </button>
+    <button class="nav-btn" onclick="showPage('leads', this); switchLeadMode('city')">
+      <span class="icon">📋</span> Lead Finder — City
+    </button>
+    <button class="nav-btn" onclick="showPage('leads', this); switchLeadMode('province')">
+      <span class="icon">🗺</span> Lead Finder — Province
+    </button>
+  </aside>
+
+  <!-- Main content -->
+  <main>
+
+    <!-- ── New Audit page ── -->
+    <div id="page-audit" class="page active">
+      <div class="card">
+        <div class="card-title">🔍 New Audit</div>
+
+        <!-- Mode tabs -->
+        <div class="mode-tabs">
+          <button class="mode-tab active" id="modeTabSearch" onclick="switchAuditMode('search')">🔍 Search by Niche &amp; Location</button>
+          <button class="mode-tab" id="modeTabUrl" onclick="switchAuditMode('url')">🌐 Audit a Single URL</button>
+        </div>
+
+        <!-- ── Search mode ── -->
+        <div id="auditModeSearch">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Business Type (Niche)</label>
+              <input id="niche" type="text" placeholder='e.g. law firms' value="law firms">
+            </div>
+            <div class="form-group">
+              <label>Location</label>
+              <input id="location" type="text" placeholder='e.g. Vancouver, BC' value="Vancouver, BC">
+            </div>
+            <div class="form-group">
+              <label>Score Threshold</label>
+              <input id="threshold" type="number" min="0" max="100" value="65">
+            </div>
+            <div class="form-group">
+              <label>How many businesses to search?</label>
+              <select id="maxResults">
+                <option value="10">10 businesses (~1 min)</option>
+                <option value="20" selected>20 businesses (~2 min)</option>
+                <option value="50">50 businesses (~5 min)</option>
+                <option value="100">100 businesses (~10 min)</option>
+                <option value="250">250 businesses (~25 min)</option>
+                <option value="500">500 businesses (~50 min)</option>
+                <option value="1000">1,000 businesses (~2 hrs)</option>
+              </select>
+            </div>
+            <div class="form-group full">
+              <button id="startBtn" class="btn btn-primary" onclick="startAudit()">▶ Start Audit</button>
+            </div>
+          </div>
+
+          <!-- Progress -->
+          <div class="progress-wrap" id="progressWrap">
+            <div class="progress-info">
+              <span id="progressLabel">Auditing…</span>
+              <span id="progressCount">0 / 0</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="progressBar" style="width:0%"></div>
+            </div>
+            <div class="progress-current" id="progressCurrent"></div>
+          </div>
+        </div>
+
+        <!-- ── Single URL mode ── -->
+        <div id="auditModeUrl" style="display:none">
+          <div class="form-grid">
+            <div class="form-group full">
+              <label>Website URL</label>
+              <input id="singleUrl" type="text" placeholder="https://example.com" style="font-size:15px">
+            </div>
+            <div class="form-group">
+              <label>Score Threshold (for PDF report)</label>
+              <input id="singleThreshold" type="number" min="0" max="100" value="65">
+            </div>
+            <div class="form-group full">
+              <button id="singleStartBtn" class="btn btn-primary" onclick="startSingleAudit()">▶ Audit This URL</button>
+            </div>
+          </div>
+
+          <!-- Single URL result -->
+          <div id="singleResult" style="display:none"></div>
+        </div>
+
+      </div>
+
+      <!-- Live results during audit -->
+      <div class="card" id="liveResultsCard" style="display:none">
+        <div class="card-title">📋 Live Results</div>
+        <div id="liveTable"></div>
+      </div>
+    </div>
+
+    <!-- ── Results page ── -->
+    <div id="page-results" class="page">
+      <div id="statsRow" class="stats" style="display:none">
+        <div class="stat-card"><div class="stat-label">Total Audited</div><div class="stat-value" id="statTotal">0</div></div>
+        <div class="stat-card"><div class="stat-label">Passed</div><div class="stat-value" id="statPass" style="color:var(--green)">0</div></div>
+        <div class="stat-card"><div class="stat-label">Failed</div><div class="stat-value" id="statFail" style="color:var(--red)">0</div></div>
+        <div class="stat-card"><div class="stat-label">Avg Score</div><div class="stat-value" id="statAvg">—</div></div>
+      </div>
+
+      <div class="card">
+        <div class="results-header">
+          <div class="card-title" style="margin:0">All Results</div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <div class="filter-row">
+              <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+              <button class="filter-btn" onclick="setFilter('fail',this)">Failed</button>
+              <button class="filter-btn" onclick="setFilter('pass',this)">Passed</button>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="loadResults()">↻ Refresh</button>
+            <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red)" onclick="clearCache()">🗑 Clear Cache</button>
+          </div>
+        </div>
+        <div id="resultsTable">
+          <div class="empty"><div class="icon">📭</div><p>No results yet. Run an audit first.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Lead Finder page ── -->
+    <div id="page-leads" class="page">
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div class="card-title" style="margin:0">📋 Lead Finder</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span id="leadCacheStats" style="font-size:12px;color:var(--muted)"></span>
+            <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red)" onclick="clearLeadCache()">🗑 Clear Lead Cache</button>
+          </div>
+        </div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:16px">
+          Search for businesses, find their contact emails, and export everything to a CSV file — no accessibility audit needed.
+        </p>
+
+        <!-- Lead mode tabs -->
+        <div class="mode-tabs" style="margin-bottom:20px">
+          <button class="mode-tab active" id="leadTabCity"     onclick="switchLeadMode('city')">🏙 City Search</button>
+          <button class="mode-tab"        id="leadTabProvince" onclick="switchLeadMode('province')">🗺 Province Search</button>
+        </div>
+
+        <!-- ── City Search ── -->
+        <div id="leadModeCity">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Business Type (Niche)</label>
+            <input id="leadsNiche" type="text" placeholder='e.g. law firms'>
+          </div>
+          <div class="form-group">
+            <label>Location</label>
+            <input id="leadsLocation" type="text" placeholder='e.g. Vancouver, BC'>
+          </div>
+          <div class="form-group full">
+            <label>How many businesses?</label>
+            <select id="leadsMax">
+              <option value="20">20 businesses (~1 min)</option>
+              <option value="50">50 businesses (~2 min)</option>
+              <option value="100">100 businesses (~5 min)</option>
+              <option value="250">250 businesses (~15 min)</option>
+              <option value="500">500 businesses (~30 min)</option>
+              <option value="1000">1,000 businesses (~1 hr)</option>
+              <option value="2000" selected>2,000 businesses (~2 hrs)</option>
+            </select>
+          </div>
+          <div class="form-group full" style="margin-top:-8px">
+            <p style="font-size:11.5px;color:var(--muted);line-height:1.6">
+              ℹ️ Google Places returns up to 60 results per search. For larger targets the tool automatically runs multiple searches (north, south, downtown, etc.) and removes duplicates. Results may vary by city size.
+            </p>
+          </div>
+          <div class="form-group full">
+            <button id="leadsStartBtn" class="btn btn-primary" onclick="startLeads()">
+              ▶ Find Leads
+            </button>
+          </div>
+        </div>
+
+        <!-- Progress -->
+        <div class="progress-wrap" id="leadsProgressWrap">
+          <div class="progress-info">
+            <span id="leadsProgressLabel">Searching…</span>
+            <span id="leadsProgressCount">0 / 0</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="leadsProgressBar" style="width:0%"></div>
+          </div>
+          <div class="progress-current" id="leadsProgressCurrent"></div>
+        </div>
+      </div><!-- end city search card -->
+
+        <!-- ── Province Search ── -->
+      <div class="card" id="provinceCard" style="display:none">
+        <div class="card-title">🗺 Province Search</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:16px">
+          Search every major city in a province automatically. Results are combined and deduplicated into one CSV.
+        </p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Province</label>
+            <select id="provinceSelect">
+              <option value="">Select a province…</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Business Type (Niche)</label>
+            <input id="provinceNiche" type="text" placeholder='e.g. dental clinics'>
+          </div>
+          <div class="form-group full">
+            <label>Results per city</label>
+            <select id="provincePerCity">
+              <option value="20">20 per city — fastest, lower cost</option>
+              <option value="60" selected>60 per city — recommended</option>
+              <option value="120">120 per city — uses sub-location variants, higher cost</option>
+            </select>
+          </div>
+          <div class="form-group full" style="margin-top:-8px">
+            <p style="font-size:11.5px;color:var(--muted);line-height:1.6">
+              ℹ️ The tool searches every major city in the province one by one, deduplicates, and combines into a single CSV. Ontario (~70 cities) and Quebec (~55 cities) may take several hours to complete.
+            </p>
+          </div>
+          <div class="form-group full">
+            <button id="provinceStartBtn" class="btn btn-primary" onclick="startProvinceSearch()">
+              🗺 Search Entire Province
+            </button>
+          </div>
+        </div>
+
+        <!-- Province progress -->
+        <div class="progress-wrap" id="provinceProgressWrap">
+          <div class="progress-info">
+            <span id="provinceProgressLabel">Searching…</span>
+            <span id="provinceProgressCount">City 0 / 0</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="provinceProgressBar" style="width:0%"></div>
+          </div>
+          <div class="progress-current" id="provinceProgressCurrent"></div>
+          <div style="margin-top:8px;font-size:12px;color:var(--accent);font-weight:600" id="provinceTotalSoFar"></div>
+        </div>
+      </div><!-- end province card -->
+
+      <!-- Province results -->
+      <div class="card" id="provinceResultsCard" style="display:none">
+        <div class="results-header">
+          <div class="card-title" style="margin:0">
+            🗺 Province Leads  <span id="provinceLeadsCount" style="font-size:13px;font-weight:400;color:var(--muted)"></span>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="downloadProvinceCsv()">⬇ With Email</button>
+          <button class="btn btn-outline btn-sm" onclick="downloadProvinceNoEmailCsv()" title="Businesses with no email found — includes ChatGPT prompt">⬇ No Email (ChatGPT)</button>
+        </div>
+        <div id="provinceLeadsTable"></div>
+      </div>
+
+      <!-- Results -->
+      <div class="card" id="leadsResultsCard" style="display:none">
+        <div class="results-header">
+          <div class="card-title" style="margin:0">
+            📋 Leads  <span id="leadsCount" style="font-size:13px;font-weight:400;color:var(--muted)"></span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" onclick="downloadCsv()">⬇ With Email</button>
+            <button class="btn btn-outline btn-sm" onclick="downloadNoEmailCsv()" title="Download businesses where no email was found — includes a ready-made ChatGPT prompt">⬇ No Email (ChatGPT)</button>
+          </div>
+        </div>
+        <div id="leadsTable"></div>
+      </div>
+
+    </div>
+
+  </main>
+</div>
+
+<!-- ── Email Modal ── -->
+<div class="modal-overlay" id="emailModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>📧 Send Accessibility Report</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>To</label>
+        <div class="to-field">
+          <input id="emailTo" type="email" placeholder="contact@lawfirm.com">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Subject</label>
+        <input id="emailSubject" type="text">
+      </div>
+      <div class="form-group">
+        <label>Body</label>
+        <textarea id="emailBody" rows="14"></textarea>
+      </div>
+      <div id="attachmentSection" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg);border-radius:8px;border:1.5px solid var(--border)">
+        <input type="checkbox" id="attachPdf" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)">
+        <label for="attachPdf" id="attachmentNote" style="font-size:13px;color:var(--text);cursor:pointer;font-weight:normal;text-transform:none;letter-spacing:0"></label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="sendBtn" onclick="confirmSend()">📤 Send Email</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Confirm Modal ── -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h2>⚠️ Confirm Send</h2>
+      <button class="modal-close" onclick="closeConfirm()">×</button>
+    </div>
+    <div class="modal-body" style="gap:12px">
+      <p style="font-size:14px;line-height:1.6">You are about to send an email to:</p>
+      <div style="background:var(--bg);border-radius:8px;padding:12px 16px;font-size:13px">
+        <div><strong>To:</strong> <span id="confirmTo"></span></div>
+        <div style="margin-top:4px"><strong>Subject:</strong> <span id="confirmSubject"></span></div>
+        <div style="margin-top:4px" id="confirmAttach"></div>
+      </div>
+      <p style="font-size:13px;color:var(--muted)">This cannot be undone. Are you sure you want to send?</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeConfirm()">Go Back</button>
+      <button class="btn btn-primary" onclick="sendEmail()" id="confirmSendBtn">✅ Yes, Send It</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let pollTimer   = null;
+let allResults  = [];
+let currentFilter = 'all';
+let emailContext  = {};
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'results') loadResults();
+}
+
+// ── Audit mode switcher ────────────────────────────────────────────────────
+function switchAuditMode(mode) {
+  const isSearch = mode === 'search';
+  document.getElementById('auditModeSearch').style.display = isSearch ? 'block' : 'none';
+  document.getElementById('auditModeUrl').style.display    = isSearch ? 'none'  : 'block';
+  document.getElementById('modeTabSearch').classList.toggle('active', isSearch);
+  document.getElementById('modeTabUrl').classList.toggle('active', !isSearch);
+}
+
+// ── Single URL audit ───────────────────────────────────────────────────────
+async function startSingleAudit() {
+  const url       = document.getElementById('singleUrl').value.trim();
+  const threshold = parseInt(document.getElementById('singleThreshold').value) || 65;
+  if (!url) return toast('Please enter a URL.', true);
+
+  const btn = document.getElementById('singleStartBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Auditing… (this takes ~30–60 seconds)';
+
+  const resultEl = document.getElementById('singleResult');
+  resultEl.style.display = 'block';
+  resultEl.innerHTML = `
+    <div style="padding:24px;text-align:center;color:var(--muted)">
+      <div style="font-size:28px;margin-bottom:10px">⏳</div>
+      <div style="font-size:14px">Running Lighthouse + axe-core on ${esc(url)}…</div>
+      <div style="font-size:12px;margin-top:6px">Please wait, this usually takes 30–60 seconds.</div>
+    </div>`;
+
+  try {
+    const res  = await fetch('/api/audit/url', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ url, threshold }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      resultEl.innerHTML = `<div style="padding:16px;color:var(--red)">❌ Error: ${esc(data.error)}</div>`;
+      return;
+    }
+
+    renderSingleResult(url, data, threshold);
+  } catch (err) {
+    resultEl.innerHTML = `<div style="padding:16px;color:var(--red)">❌ Request failed: ${esc(err.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶ Audit This URL';
+  }
+}
+
+function renderSingleResult(url, data, threshold) {
+  const score      = data.score ?? null;
+  const scoreColor = score === null ? '#718096' : score >= 90 ? '#276749' : score >= 70 ? '#b7791f' : score >= 50 ? '#c05621' : '#c53030';
+  const scoreLabel = score === null ? 'Error' : score >= 90 ? 'Excellent' : score >= 70 ? 'Moderate' : score >= 50 ? 'Poor' : 'Critical';
+  const lhFails    = Object.keys(data.lighthouseAudits || {}).length;
+  const axeCount   = (data.axeViolations || []).length;
+  const critCount  = (data.axeViolations || []).filter(v => v.impact === 'critical').length;
+
+  const pdfBtn = data.pdfFile
+    ? `<a href="/reports/${encodeURIComponent(data.pdfFile)}" target="_blank" class="btn btn-outline btn-sm">📄 Download PDF Report</a>`
+    : `<span style="font-size:12px;color:var(--muted)">No PDF (score ${score} ≥ threshold ${threshold})</span>`;
+
+  const emailSite = {
+    name:          new URL(url.startsWith('http') ? url : 'https://'+url).hostname.replace(/^www\./,''),
+    url,
+    score,
+    email:         data.email || null,
+    pdfFile:       data.pdfFile || null,
+    axeViolations: data.axeViolations || [],
+  };
+  const emailBtn = `<button class="btn btn-primary btn-sm" onclick='openEmail(${JSON.stringify(emailSite)})'>
+    📧 Email${data.email ? ' ✓' : ''}
+  </button>`;
+
+  document.getElementById('singleResult').innerHTML = `
+    <div class="url-result">
+      <div class="url-result-header">
+        <div class="url-score-circle" style="background:${scoreColor}">${score ?? '—'}</div>
+        <div>
+          <div style="font-size:15px;font-weight:700">${scoreLabel} Accessibility</div>
+          <div style="font-size:11px;color:#90cdf4;margin-top:2px">${esc(url)}</div>
+        </div>
+      </div>
+      <div class="url-result-body">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div class="stat-card" style="padding:12px 14px">
+            <div class="stat-label">Score</div>
+            <div class="stat-value" style="font-size:22px;color:${scoreColor}">${score ?? '—'}/100</div>
+          </div>
+          <div class="stat-card" style="padding:12px 14px">
+            <div class="stat-label">Lighthouse Issues</div>
+            <div class="stat-value" style="font-size:22px">${lhFails}</div>
+          </div>
+          <div class="stat-card" style="padding:12px 14px">
+            <div class="stat-label">WCAG Violations</div>
+            <div class="stat-value" style="font-size:22px;color:${axeCount > 0 ? 'var(--red)' : 'var(--green)'}">${axeCount}</div>
+          </div>
+        </div>
+        ${critCount > 0 ? `<div style="background:#fff5f5;border:1.5px solid var(--red);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--red)">⚠️ <strong>${critCount} critical violation${critCount !== 1 ? 's' : ''}</strong> — these prevent users with disabilities from accessing key content.</div>` : ''}
+        ${data.email ? `<div style="font-size:13px;color:var(--muted)">📧 Contact email found: <strong style="color:var(--text)">${esc(data.email)}</strong></div>` : ''}
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          ${pdfBtn}
+          ${emailBtn}
+        </div>
+        ${data.error ? `<div style="font-size:12px;color:var(--amber)">⚠️ Partial result: ${esc(data.error)}</div>` : ''}
+      </div>
+    </div>`;
+}
+
+// ── Start audit ────────────────────────────────────────────────────────────
+async function startAudit() {
+  const niche      = document.getElementById('niche').value.trim();
+  const location   = document.getElementById('location').value.trim();
+  const threshold  = parseInt(document.getElementById('threshold').value);
+  const maxResults = parseInt(document.getElementById('maxResults').value);
+
+  if (!niche || !location) return toast('Please enter a niche and location.', true);
+
+  const btn = document.getElementById('startBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Starting…';
+
+  const res = await fetch('/api/audit/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ niche, location, threshold, maxResults }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    toast(data.error || 'Failed to start audit.', true);
+    btn.disabled = false; btn.textContent = '▶ Start Audit';
+    return;
+  }
+
+  document.getElementById('progressWrap').classList.add('visible');
+  document.getElementById('liveResultsCard').style.display = 'block';
+  document.getElementById('liveTable').innerHTML = '';
+  pollTimer = setInterval(pollStatus, 1500);
+}
+
+// ── Poll status ────────────────────────────────────────────────────────────
+async function pollStatus() {
+  const res  = await fetch('/api/audit/status');
+  const data = await res.json();
+
+  const pct = data.total > 0 ? Math.round((data.done / data.total) * 100) : 0;
+  document.getElementById('progressBar').style.width   = pct + '%';
+  document.getElementById('progressCount').textContent = `${data.done} / ${data.total || '?'}`;
+  document.getElementById('progressLabel').textContent = data.running ? 'Auditing…' : 'Complete';
+  document.getElementById('progressCurrent').textContent = data.current ? `Currently: ${data.current}` : '';
+
+  renderLiveTable(data.sites);
+
+  if (!data.running) {
+    clearInterval(pollTimer);
+    const btn = document.getElementById('startBtn');
+    btn.disabled = false; btn.textContent = '▶ Start Audit';
+
+    if (data.error) toast('Audit error: ' + data.error, true);
+    else toast(`✅ Audit complete — ${data.sites.length} sites processed`);
+  }
+}
+
+function renderLiveTable(sites) {
+  if (!sites || sites.length === 0) return;
+  document.getElementById('liveTable').innerHTML = buildTable(sites);
+}
+
+// ── Results page ───────────────────────────────────────────────────────────
+async function loadResults() {
+  const res  = await fetch('/api/results');
+  const data = await res.json();
+
+  allResults = data.map(entry => ({
+    name:          entry.business?.name || 'Unknown',
+    url:           entry.business?.website || '',
+    score:         entry.auditResult?.score ?? null,
+    violations:    entry.auditResult?.axeViolations?.length ?? 0,
+    status:        statusOf(entry.auditResult),
+    pdfFile:       null,
+    auditedAt:     entry.auditedAt,
+    axeViolations: entry.auditResult?.axeViolations || [],
+    email:         entry.auditResult?.email || null,
+  }));
+
+  // Match PDFs
+  const pdfRes   = await fetch('/api/reports');
+  const pdfFiles = await pdfRes.json();
+  allResults.forEach(r => {
+    const safe = r.name.replace(/[^a-z0-9]/gi, '_');
+    const match = pdfFiles.find(p => p.filename.startsWith(safe));
+    if (match) r.pdfFile = match.filename;
+  });
+
+  updateStats();
+  renderResults();
+}
+
+function statusOf(audit) {
+  if (!audit || audit.score === null) return 'error';
+  return audit.score >= 65 ? 'pass' : 'fail';
+}
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderResults();
+}
+
+function renderResults() {
+  const filtered = currentFilter === 'all'
+    ? allResults
+    : allResults.filter(r => r.status === currentFilter);
+
+  if (filtered.length === 0) {
+    document.getElementById('resultsTable').innerHTML =
+      '<div class="empty"><div class="icon">📭</div><p>No results match this filter.</p></div>';
+    return;
+  }
+  document.getElementById('resultsTable').innerHTML = buildTable(filtered, true);
+}
+
+function updateStats() {
+  const total = allResults.length;
+  const pass  = allResults.filter(r => r.status === 'pass').length;
+  const fail  = allResults.filter(r => r.status === 'fail').length;
+  const scores = allResults.map(r => r.score).filter(s => s !== null);
+  const avg   = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : null;
+
+  document.getElementById('statsRow').style.display = total ? 'grid' : 'none';
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statPass').textContent  = pass;
+  document.getElementById('statFail').textContent  = fail;
+  document.getElementById('statAvg').textContent   = avg !== null ? avg + '/100' : '—';
+}
+
+// ── Table builder ──────────────────────────────────────────────────────────
+function buildTable(sites, withActions = false) {
+  const rows = sites.map(s => {
+    const sc    = s.score;
+    const cls   = sc === null ? 'error' : sc >= 90 ? 'good' : sc >= 70 ? 'moderate' : sc >= 50 ? 'poor' : 'critical';
+    const label = sc !== null ? sc : '—';
+    const pdfBtn = s.pdfFile
+      ? `<a href="/reports/${encodeURIComponent(s.pdfFile)}" target="_blank" class="btn btn-outline btn-sm">📄 PDF</a>`
+      : '';
+    const emailLabel = s.email ? `📧 Email` : `📧 Email`;
+    const emailTitle = s.email ? `Send to ${s.email}` : 'No email found — you can enter one manually';
+    const emailBtn = withActions
+      ? `<button class="btn btn-primary btn-sm" onclick='openEmail(${JSON.stringify(s)})' title="${emailTitle}" style="${s.email ? '' : 'opacity:.6'}">${emailLabel}${s.email ? ' ✓' : ''}</button>`
+      : '';
+
+    return `<tr>
+      <td>
+        <div class="firm-name">${esc(s.name)}</div>
+        <div class="firm-url"><a href="${esc(s.url)}" target="_blank">${esc(s.url)}</a></div>
+      </td>
+      <td><div class="score ${cls}">${label}</div></td>
+      <td>${s.violations}</td>
+      <td><span class="pill ${s.status}">${s.status}</span></td>
+      <td style="white-space:nowrap;display:flex;gap:6px">${pdfBtn}${emailBtn}</td>
+    </tr>`;
+  }).join('');
+
+  return `<table>
+    <thead><tr>
+      <th>Firm</th><th>Score</th><th>Violations</th><th>Status</th><th>Actions</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+// ── Email modal ────────────────────────────────────────────────────────────
+async function openEmail(site) {
+  emailContext = site;
+
+  // Fetch draft
+  const res  = await fetch('/api/email/draft', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name:       site.name,
+      website:    site.url,
+      score:      site.score,
+      violations: site.axeViolations || [],
+    }),
+  });
+  const draft = await res.json();
+
+  document.getElementById('emailTo').value      = site.email || '';
+  document.getElementById('emailSubject').value = draft.subject;
+  document.getElementById('emailBody').value    = draft.body;
+
+  const attachCheckbox = document.getElementById('attachPdf');
+  const attachNote     = document.getElementById('attachmentNote');
+  const attachSection  = document.getElementById('attachmentSection');
+
+  if (site.pdfFile) {
+    attachCheckbox.checked  = true;
+    attachCheckbox.disabled = false;
+    attachNote.textContent  = `📎 Include PDF report: ${site.pdfFile}`;
+    attachSection.style.opacity = '1';
+  } else {
+    attachCheckbox.checked  = false;
+    attachCheckbox.disabled = true;
+    attachNote.textContent  = '📎 No PDF report available for this site';
+    attachSection.style.opacity = '0.5';
+  }
+
+  document.getElementById('emailModal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('emailModal').classList.remove('open');
+}
+
+function confirmSend() {
+  const toEmail = document.getElementById('emailTo').value.trim();
+  const subject = document.getElementById('emailSubject').value.trim();
+  if (!toEmail) return toast('Please enter a recipient email address.', true);
+  if (!subject) return toast('Please enter a subject.', true);
+
+  const includePdf = document.getElementById('attachPdf').checked && emailContext.pdfFile;
+
+  document.getElementById('confirmTo').textContent      = toEmail;
+  document.getElementById('confirmSubject').textContent = subject;
+  document.getElementById('confirmAttach').textContent  =
+    includePdf ? `📎 Attachment: ${emailContext.pdfFile}` : '📎 No attachment';
+
+  document.getElementById('confirmModal').classList.add('open');
+}
+
+function closeConfirm() {
+  document.getElementById('confirmModal').classList.remove('open');
+}
+
+async function sendEmail() {
+  closeConfirm();
+  const toEmail = document.getElementById('emailTo').value.trim();
+  const subject = document.getElementById('emailSubject').value.trim();
+  const body    = document.getElementById('emailBody').value.trim();
+
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = true; btn.textContent = '⏳ Sending…';
+
+  const includePdf = document.getElementById('attachPdf').checked && emailContext.pdfFile;
+
+  const res = await fetch('/api/email/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      toEmail, subject, body,
+      reportFilename: includePdf ? emailContext.pdfFile : null,
+    }),
+  });
+
+  const data = await res.json();
+  btn.disabled = false; btn.textContent = '📤 Send Email';
+
+  if (!res.ok) { toast(data.error || 'Failed to send email.', true); return; }
+
+  toast(`✅ Email sent to ${toEmail}`);
+  closeModal();
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function toast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => el.className = 'toast', 3500);
+}
+
+// ── Clear cache ────────────────────────────────────────────────────────────
+async function clearCache() {
+  if (!confirm('This will clear all saved audit results from the cache. Previously audited sites will be re-audited on the next run.\n\nAre you sure?')) return;
+  const res = await fetch('/api/cache/clear', { method: 'POST' });
+  if (res.ok) {
+    allResults = [];
+    updateStats();
+    renderResults();
+    toast('✅ Cache cleared — all sites will be re-audited on next run');
+  } else {
+    toast('Failed to clear cache.', true);
+  }
+}
+
+// Load results on start
+loadResults();
+
+// ── Lead Finder ────────────────────────────────────────────────────────────
+let leadsPollTimer = null;
+
+async function startLeads() {
+  const niche      = document.getElementById('leadsNiche').value.trim();
+  const location   = document.getElementById('leadsLocation').value.trim();
+  const maxResults = parseInt(document.getElementById('leadsMax').value);
+
+  if (!niche || !location) return toast('Please enter a niche and location.', true);
+
+  const btn = document.getElementById('leadsStartBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Starting…';
+
+  const res  = await fetch('/api/leads/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ niche, location, maxResults }),
+  });
+  const data = await res.json();
+
+  if (!res.ok) {
+    toast(data.error || 'Failed to start.', true);
+    btn.disabled = false; btn.textContent = '▶ Find Leads';
+    return;
+  }
+
+  document.getElementById('leadsProgressWrap').classList.add('visible');
+  document.getElementById('leadsResultsCard').style.display = 'none';
+  document.getElementById('leadsTable').innerHTML = '';
+  leadsPollTimer = setInterval(pollLeads, 1500);
+}
+
+async function pollLeads() {
+  const res  = await fetch('/api/leads/status');
+  const data = await res.json();
+
+  const pct = data.total > 0 ? Math.round((data.done / data.total) * 100) : 0;
+  document.getElementById('leadsProgressBar').style.width    = pct + '%';
+  document.getElementById('leadsProgressCount').textContent  = `${data.done} / ${data.total || '?'}`;
+  document.getElementById('leadsProgressLabel').textContent  = data.running ? 'Searching…' : 'Complete';
+  document.getElementById('leadsProgressCurrent').textContent = data.current ? `Currently: ${data.current}` : '';
+
+  if (data.leads && data.leads.length > 0) {
+    renderLeadsTable(data.leads);
+  }
+
+  if (!data.running) {
+    clearInterval(leadsPollTimer);
+    const btn = document.getElementById('leadsStartBtn');
+    btn.disabled = false; btn.textContent = '▶ Find Leads';
+    if (data.error) toast('Error: ' + data.error, true);
+    else toast(`✅ Done — ${data.leads.length} leads found`);
+  }
+}
+
+function renderLeadsTable(leads) {
+  document.getElementById('leadsResultsCard').style.display = 'block';
+  document.getElementById('leadsCount').textContent = `(${leads.length} found)`;
+
+  const rows = leads.map(l => {
+    const emailCell = l.email
+      ? `<a href="mailto:${esc(l.email)}" style="color:var(--accent)">${esc(l.email)}</a>`
+      : '<span style="color:var(--muted)">—</span>';
+    return `<tr>
+      <td><div class="firm-name">${esc(l.name)}</div></td>
+      <td><a href="${esc(l.website)}" target="_blank" style="font-size:12px;color:var(--accent)">${esc(l.website)}</a></td>
+      <td>${emailCell}</td>
+      <td style="font-size:12px;color:var(--muted)">${esc(l.phone)}</td>
+      <td style="font-size:12px;color:var(--muted)">${esc(l.address)}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('leadsTable').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Business</th>
+        <th>Website</th>
+        <th>Email</th>
+        <th>Phone</th>
+        <th>Address</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function downloadCsv() {
+  window.location.href = '/api/leads/download';
+}
+
+function downloadNoEmailCsv() {
+  window.location.href = '/api/leads/download/noemail';
+}
+
+function downloadProvinceCsv() {
+  window.location.href = '/api/leads/province/download';
+}
+
+function downloadProvinceNoEmailCsv() {
+  window.location.href = '/api/leads/province/download/noemail';
+}
+
+async function clearLeadCache() {
+  if (!confirm('This will clear all cached lead emails. Future searches will re-scrape every website.\n\nAre you sure?')) return;
+  const res = await fetch('/api/leads/cache/clear', { method: 'POST' });
+  if (res.ok) {
+    toast('✅ Lead cache cleared');
+    loadLeadCacheStats();
+  } else {
+    toast('Failed to clear cache.', true);
+  }
+}
+
+async function loadLeadCacheStats() {
+  try {
+    const res  = await fetch('/api/leads/cache/stats');
+    const data = await res.json();
+    const el   = document.getElementById('leadCacheStats');
+    if (el) el.textContent = data.size > 0 ? `📦 ${data.size.toLocaleString()} cached` : '';
+  } catch {}
+}
+
+// ── Lead mode switcher ──────────────────────────────────────────────────────
+function switchLeadMode(mode) {
+  const isCity = mode === 'city';
+  // Show/hide the two main cards
+  document.querySelectorAll('.card').forEach(c => {
+    if (c.id === 'provinceCard' || c.id === 'provinceResultsCard') {
+      c.style.display = isCity ? 'none' : 'block';
+    }
+  });
+  // The city search card is the first card inside #page-leads
+  const cityCards = document.querySelectorAll('#page-leads .card');
+  if (cityCards[0]) cityCards[0].style.display = isCity ? 'block' : 'none';
+  if (document.getElementById('leadsResultsCard'))
+    document.getElementById('leadsResultsCard').style.display = isCity && leadsHaveResults() ? 'block' : 'none';
+}
+
+function leadsHaveResults() {
+  return document.getElementById('leadsTable').innerHTML.trim().length > 0;
+}
+
+// ── Province search ─────────────────────────────────────────────────────────
+let provincePollTimer = null;
+
+// Load province list on startup
+async function loadProvinces() {
+  try {
+    const res  = await fetch('/api/provinces');
+    const list = await res.json();
+    const sel  = document.getElementById('provinceSelect');
+    list.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p; opt.textContent = p;
+      sel.appendChild(opt);
+    });
+  } catch {}
+}
+
+async function startProvinceSearch() {
+  const province = document.getElementById('provinceSelect').value;
+  const niche    = document.getElementById('provinceNiche').value.trim();
+  const perCity  = parseInt(document.getElementById('provincePerCity').value);
+
+  if (!province) return toast('Please select a province.', true);
+  if (!niche)    return toast('Please enter a business type.', true);
+
+  const btn = document.getElementById('provinceStartBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Starting…';
+
+  const res  = await fetch('/api/leads/province/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ province, niche, perCity }),
+  });
+  const data = await res.json();
+
+  if (!res.ok) {
+    toast(data.error || 'Failed to start.', true);
+    btn.disabled = false; btn.textContent = '🗺 Search Entire Province';
+    return;
+  }
+
+  document.getElementById('provinceProgressWrap').classList.add('visible');
+  document.getElementById('provinceResultsCard').style.display = 'none';
+  document.getElementById('provinceLeadsTable').innerHTML = '';
+  toast(`Starting province scan — ${data.totalCities} cities to search`);
+
+  provincePollTimer = setInterval(pollProvince, 2000);
+}
+
+async function pollProvince() {
+  const res  = await fetch('/api/leads/province/status');
+  const data = await res.json();
+
+  const pct = data.totalCities > 0 ? Math.round((data.cityIndex / data.totalCities) * 100) : 0;
+  document.getElementById('provinceProgressBar').style.width     = pct + '%';
+  document.getElementById('provinceProgressCount').textContent   = `City ${data.cityIndex} / ${data.totalCities}`;
+  document.getElementById('provinceProgressLabel').textContent   = data.running ? 'Searching province…' : 'Complete';
+  document.getElementById('provinceProgressCurrent').textContent = data.current ? `Currently: ${data.current}` : '';
+  document.getElementById('provinceTotalSoFar').textContent      = data.totalLeads > 0 ? `✅ ${data.totalLeads} unique leads found so far` : '';
+
+  if (data.leads && data.leads.length > 0) {
+    renderProvinceTable(data.leads);
+  }
+
+  if (!data.running) {
+    clearInterval(provincePollTimer);
+    const btn = document.getElementById('provinceStartBtn');
+    btn.disabled = false; btn.textContent = '🗺 Search Entire Province';
+    if (data.error) toast('Error: ' + data.error, true);
+    else toast(`✅ Province scan complete — ${data.totalLeads} unique leads found`);
+  }
+}
+
+function renderProvinceTable(leads) {
+  document.getElementById('provinceResultsCard').style.display = 'block';
+  document.getElementById('provinceLeadsCount').textContent    = `(${leads.length} unique leads)`;
+
+  const rows = leads.map(l => {
+    const emailCell = l.email
+      ? `<a href="mailto:${esc(l.email)}" style="color:var(--accent)">${esc(l.email)}</a>`
+      : '<span style="color:var(--muted)">—</span>';
+    return `<tr>
+      <td><div class="firm-name">${esc(l.name)}</div><div class="firm-url">${esc(l.city)}</div></td>
+      <td><a href="${esc(l.website)}" target="_blank" style="font-size:12px;color:var(--accent)">${esc(l.website)}</a></td>
+      <td>${emailCell}</td>
+      <td style="font-size:12px;color:var(--muted)">${esc(l.phone)}</td>
+      <td style="font-size:12px;color:var(--muted)">${esc(l.address)}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('provinceLeadsTable').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Business / City</th><th>Website</th><th>Email</th><th>Phone</th><th>Address</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function downloadProvinceCsv() {
+  window.location.href = '/api/leads/province/download';
+}
+
+// Load provinces on startup
+loadProvinces();
+loadLeadCacheStats();
+</script>
+</body>
+</html>
