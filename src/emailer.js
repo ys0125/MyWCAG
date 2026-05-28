@@ -2,45 +2,31 @@
 
 'use strict';
 
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const fs         = require('fs');
 
 async function sendReport(business, audit, pdfPath, toEmail) {
-  const user     = process.env.SMTP_USER;
-  const password = process.env.SMTP_PASSWORD;
-  const fromName = process.env.EMAIL_FROM_NAME || user;
-  const host     = process.env.SMTP_HOST || 'smtpout.secureserver.net';
-  const port     = parseInt(process.env.SMTP_PORT || '587', 10);
+  const apiKey  = process.env.RESEND_API_KEY;
+  const from    = process.env.EMAIL_FROM || 'MyWCAG <reports@mywcag.com>';
 
-  if (!user || !password) {
-    throw new Error(
-      'SMTP_USER and SMTP_PASSWORD must be set in your .env file.\n' +
-      'Use your full GoDaddy email address and its password.'
-    );
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY must be set in your .env file.');
   }
 
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,   // true for SSL (465), false for TLS (587)
-    auth: { user, pass: password },
-    tls: { rejectUnauthorized: false }, // GoDaddy sometimes uses self-signed certs
-  });
-
+  const resend  = new Resend(apiKey);
   const subject = buildSubject(business, audit);
   const body    = buildBody(business, audit);
 
-  await transporter.sendMail({
-    from:        `"${fromName}" <${user}>`,
-    to:          toEmail,
+  await resend.emails.send({
+    from,
+    to:      toEmail,
     subject,
-    text:        body,
-    html:        textToHtml(body),
+    text:    body,
+    html:    textToHtml(body),
     attachments: [
       {
-        filename:    `${business.name.replace(/[^a-z0-9]/gi, '_')}_accessibility_report.pdf`,
-        content:     fs.readFileSync(pdfPath),
-        contentType: 'application/pdf',
+        filename: `${business.name.replace(/[^a-z0-9]/gi, '_')}_accessibility_report.pdf`,
+        content:  fs.readFileSync(pdfPath),
       },
     ],
   });
@@ -94,7 +80,7 @@ I've attached a detailed PDF report outlining every issue found, the affected pa
 If you'd like to discuss the findings or explore how these issues can be resolved, I'd be happy to connect.
 
 Best regards,
-${process.env.EMAIL_FROM_NAME || 'The Accessibility Team'}
+${process.env.EMAIL_FROM_NAME || 'The MyWCAG Team'}
 
 
 ---

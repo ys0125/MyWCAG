@@ -8,7 +8,8 @@ const express   = require('express');
 const path      = require('path');
 const fs        = require('fs');
 const puppeteer = require('puppeteer');
-const nodemailer = require('nodemailer');
+const { Resend }       = require('resend');
+const { upsertContact } = require('./src/hubspot');
 
 const { discoverWebsites } = require('./src/discovery');
 const { auditWebsite }     = require('./src/auditor');
@@ -106,15 +107,14 @@ app.post('/api/email/draft', (req, res) => {
 });
 
 app.post('/api/email/send', async (req, res) => {
-  const { toEmail, subject, body, reportFilename } = req.body;
+  const { toEmail, subject, body, reportFilename, bizName, bizWebsite, bizPhone } = req.body;
   if (!toEmail || !subject || !body) {
     return res.status(400).json({ error: 'toEmail, subject, and body are required.' });
   }
 
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPass = process.env.SMTP_PASSWORD;
-  if (!smtpUser || !smtpPass) {
-    return res.status(500).json({ error: 'SMTP_USER and SMTP_PASSWORD are not set in .env' });
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: 'RESEND_API_KEY is not set in .env' });
   }
 
   const attachments = [];
@@ -122,30 +122,32 @@ app.post('/api/email/send', async (req, res) => {
     const pdfPath = path.join(REPORTS_DIR, reportFilename);
     if (fs.existsSync(pdfPath)) {
       attachments.push({
-        filename:    reportFilename,
-        content:     fs.readFileSync(pdfPath),
-        contentType: 'application/pdf',
+        filename: reportFilename,
+        content:  fs.readFileSync(pdfPath),
       });
     }
   }
 
   try {
-    const transporter = nodemailer.createTransport({
-      host:   process.env.SMTP_HOST || 'smtpout.secureserver.net',
-      port:   Number(process.env.SMTP_PORT || 587),
-      secure: Number(process.env.SMTP_PORT) === 465,
-      auth:   { user: smtpUser, pass: smtpPass },
-      tls:    { rejectUnauthorized: false },
-    });
+    const resend = new Resend(apiKey);
+    const from   = process.env.EMAIL_FROM || 'MyWCAG <reports@mywcag.com>';
 
-    await transporter.sendMail({
-      from:    `"${process.env.EMAIL_FROM_NAME || smtpUser}" <${smtpUser}>`,
+    await resend.emails.send({
+      from,
       to:      toEmail,
       subject,
       text:    body,
       html:    `<pre style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;white-space:pre-wrap">${body.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</pre>`,
       attachments,
     });
+
+    // Log the contact to HubSpot CRM (non-blocking, non-fatal)
+    upsertContact({
+      email:   toEmail,
+      name:    bizName    || '',
+      website: bizWebsite || '',
+      phone:   bizPhone   || '',
+    }).catch(() => {});
 
     res.json({ ok: true });
   } catch (err) {
