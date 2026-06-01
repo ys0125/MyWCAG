@@ -1073,17 +1073,25 @@ async function loadLeadCacheStats() {
 // ── Lead mode switcher ──────────────────────────────────────────────────────
 function switchLeadMode(mode) {
   const isCity = mode === 'city';
-  // Show/hide the two main cards
-  document.querySelectorAll('.card').forEach(c => {
-    if (c.id === 'provinceCard' || c.id === 'provinceResultsCard') {
-      c.style.display = isCity ? 'none' : 'block';
-    }
-  });
-  // The city search card is the first card inside #page-leads
-  const cityCards = document.querySelectorAll('#page-leads .card');
-  if (cityCards[0]) cityCards[0].style.display = isCity ? 'block' : 'none';
+
+  // Toggle city vs province content inside the main card
+  const citySection = document.getElementById('leadModeCity');
+  if (citySection) citySection.style.display = isCity ? 'block' : 'none';
+
+  // Show/hide province card
+  const provinceCard = document.getElementById('provinceCard');
+  if (provinceCard) provinceCard.style.display = isCity ? 'none' : 'block';
+
+  const provinceResultsCard = document.getElementById('provinceResultsCard');
+  if (provinceResultsCard) provinceResultsCard.style.display = isCity ? 'none' : (provinceResultsCard.dataset.hasResults ? 'block' : 'none');
+
+  // Toggle results card for city mode
   if (document.getElementById('leadsResultsCard'))
     document.getElementById('leadsResultsCard').style.display = isCity && leadsHaveResults() ? 'block' : 'none';
+
+  // Update tab active states
+  document.getElementById('leadTabCity').classList.toggle('active', isCity);
+  document.getElementById('leadTabProvince').classList.toggle('active', !isCity);
 }
 
 function leadsHaveResults() {
