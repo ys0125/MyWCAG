@@ -8,8 +8,9 @@ const express   = require('express');
 const path      = require('path');
 const fs        = require('fs');
 const puppeteer = require('puppeteer');
-const { Resend }       = require('resend');
+const { Resend }        = require('resend');
 const { upsertContact } = require('./src/hubspot');
+const unsubscribe       = require('./src/unsubscribe');
 
 const { discoverWebsites } = require('./src/discovery');
 const { auditWebsite }     = require('./src/auditor');
@@ -110,6 +111,10 @@ app.post('/api/email/send', async (req, res) => {
   const { toEmail, subject, body, reportFilename, bizName, bizWebsite, bizPhone } = req.body;
   if (!toEmail || !subject || !body) {
     return res.status(400).json({ error: 'toEmail, subject, and body are required.' });
+  }
+
+  if (unsubscribe.isUnsubscribed(toEmail)) {
+    return res.status(400).json({ error: `${toEmail} has unsubscribed and cannot be emailed.` });
   }
 
   const apiKey = process.env.RESEND_API_KEY;
@@ -574,6 +579,51 @@ Audit date: ${auditDate}
 `;
 }
 
+
+// Unsubscribe endpoint — sends auto-reply and saves email to unsubscribed list
+app.get('/unsubscribe', async (req, res) => {
+  const email = (req.query.email || '').toLowerCase().trim();
+  if (!email) return res.status(400).send('Missing email address.');
+
+  unsubscribe.add(email);
+
+  // Send auto-reply confirmation
+  const apiKey = process.env.RESEND_API_KEY;
+  if (apiKey) {
+    try {
+      const resend = new Resend(apiKey);
+      const from   = process.env.EMAIL_FROM || 'MyWCAG <info@mywcag.com>';
+      await resend.emails.send({
+        from,
+        to:      email,
+        subject: 'You have been unsubscribed — MyWCAG',
+        text:    `Hi,\n\nThank you for taking the time to read our email.\n\nYou have been successfully unsubscribed from our mailing list and will not receive any further emails from MyWCAG.\n\nBest regards,\nThe MyWCAG Team`,
+        html:    `<p style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;max-width:600px">
+          Hi,<br><br>
+          Thank you for taking the time to read our email.<br><br>
+          You have been successfully <strong>unsubscribed</strong> from our mailing list and will not receive any further emails from MyWCAG.<br><br>
+          Best regards,<br>
+          The MyWCAG Team
+        </p>`,
+      });
+    } catch (err) {
+      console.warn('⚠  Unsubscribe auto-reply failed:', err.message);
+    }
+  }
+
+  res.send(`
+    <html><body style="font-family:Arial,sans-serif;text-align:center;padding:60px;color:#333">
+      <h2 style="color:#1F4E79">You've been unsubscribed</h2>
+      <p>Thank you for taking the time to read our email.</p>
+      <p>You have been removed from our mailing list and will not receive any further emails from MyWCAG.</p>
+    </body></html>
+  `);
+});
+
+// Check if an email is unsubscribed before sending
+app.get('/api/unsubscribed', (_req, res) => {
+  res.json({ emails: unsubscribe.getAll() });
+});
 
 app.listen(PORT, () => {
   console.log(`\n✅ WCAG Auditor UI running at http://localhost:${PORT}\n`);

@@ -7,22 +7,24 @@ const fs         = require('fs');
 
 async function sendReport(business, audit, pdfPath, toEmail) {
   const apiKey  = process.env.RESEND_API_KEY;
-  const from    = process.env.EMAIL_FROM || 'MyWCAG <reports@mywcag.com>';
+  const from    = process.env.EMAIL_FROM || 'MyWCAG <info@mywcag.com>';
 
   if (!apiKey) {
     throw new Error('RESEND_API_KEY must be set in your .env file.');
   }
 
-  const resend  = new Resend(apiKey);
-  const subject = buildSubject(business, audit);
-  const body    = buildBody(business, audit);
+  const resend      = new Resend(apiKey);
+  const subject     = buildSubject(business, audit);
+  const baseUrl     = process.env.BASE_URL || 'https://mywcag.com';
+  const unsubLink   = `${baseUrl}/unsubscribe?email=${encodeURIComponent(toEmail)}`;
+  const body        = buildBody(business, audit, unsubLink);
 
   await resend.emails.send({
     from,
     to:      toEmail,
     subject,
     text:    body,
-    html:    textToHtml(body),
+    html:    buildHtml(body, unsubLink),
     attachments: [
       {
         filename: `${business.name.replace(/[^a-z0-9]/gi, '_')}_accessibility_report.pdf`,
@@ -40,7 +42,7 @@ function buildSubject(business, audit) {
   return `Accessibility Improvement Opportunity – ${business.name}`;
 }
 
-function buildBody(business, audit) {
+function buildBody(business, audit, unsubLink) {
   const score      = audit.score;
   const violations = audit.axeViolations || [];
   const firmName   = business.name;
@@ -87,16 +89,24 @@ ${process.env.EMAIL_FROM_NAME || 'The MyWCAG Team'}
 This report was generated automatically using Google Lighthouse and axe-core.
 Website audited: ${website}
 Audit date: ${new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })}
+
+To unsubscribe from future emails, visit: ${unsubLink}
 `;
 }
 
-function textToHtml(text) {
-  return `<html><body><pre style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;white-space:pre-wrap;max-width:600px">${
-    text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-  }</pre></body></html>`;
+function buildHtml(text, unsubLink) {
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  return `<html><body>
+<pre style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;white-space:pre-wrap;max-width:600px">${escaped}</pre>
+<p style="margin-top:32px;font-family:Arial,sans-serif;font-size:12px;color:#999999;">
+  If you no longer wish to receive emails from MyWCAG, you can
+  <a href="${unsubLink}" style="color:#2E75B6;">unsubscribe here</a>.
+</p>
+</body></html>`;
 }
 
 module.exports = { sendReport };
