@@ -36,76 +36,58 @@ async function sendReport(business, audit, pdfPath, toEmail) {
 
 
 function buildSubject(business, audit) {
-  const score = audit.score;
-  if (score === null) return `Accessibility Review – ${business.name}`;
-  if (score < 50) return `Urgent: Accessibility Issues Found on ${business.name}'s Website`;
-  return `Accessibility Improvement Opportunity – ${business.name}`;
+  return `Quick question about your clinic's website`;
 }
 
 function buildBody(business, audit, unsubLink) {
-  const score      = audit.score;
-  const violations = audit.axeViolations || [];
-  const firmName   = business.name;
-  const website    = business.website;
+  return `Hello,
 
-  const impactOrder = { critical: 0, serious: 1, moderate: 2, minor: 3 };
-  const topIssues   = [...violations]
-    .sort((a, b) => (impactOrder[a.impact] ?? 4) - (impactOrder[b.impact] ?? 4))
-    .slice(0, 3);
+I'm a fellow clinic owner, and recently I ran a website audit on my own clinic.
 
-  const issueLines = topIssues.length > 0
-    ? topIssues.map(v => `  • ${v.help} (${v.impact} impact)`).join('\n')
-    : '  • Lighthouse accessibility score below recommended threshold';
+To be honest, I was a little shocked by how low our score was. I had no idea things like website usability could affect search rankings or that there were even Canadian requirements around this stuff.
 
-  const scoreText = score !== null
-    ? `scored ${score}/100 on Google Lighthouse's accessibility audit (industry benchmark is 90+)`
-    : `has accessibility issues that could affect users with disabilities`;
+It definitely turned into one of those "well… I wish I knew that sooner" moments.
 
-  const urgency = score !== null && score < 50
-    ? 'These issues are significant and may expose your firm to legal risk under accessibility regulations.'
-    : 'Addressing these issues would improve the experience for all your clients, including those using assistive technologies.';
+Since then, I've been reaching out to other clinic owners just to share what I learned and help raise awareness.
 
-  return `Hi ${firmName} team,
+We started using software that quickly identifies areas that may create barriers for patients online, and I thought it might be helpful for your clinic too.
 
-I recently ran an accessibility audit on your website (${website}) and wanted to share the findings with you.
+If you'd like a free audit of your website, just reply to this email. No strings attached.
 
-Your site ${scoreText}. I've attached a full report, but here are the key issues identified:
+Thanks,
+Mark Bentz
+MyWCAG
+mywcag.com
+info@mywcag.com
 
-${issueLines}
-
-${urgency}
-
-Under the Accessibility for Ontarians with Disabilities Act (AODA) and similar provincial legislation, websites are increasingly expected to meet WCAG 2.1 AA standards — particularly for professional services firms like yours.
-
-I've attached a detailed PDF report outlining every issue found, the affected page elements, and specific recommendations for your development team to address them.
-
-If you'd like to discuss the findings or explore how these issues can be resolved, I'd be happy to connect.
-
-Best regards,
-${process.env.EMAIL_FROM_NAME || 'The MyWCAG Team'}
-
-
----
-This report was generated automatically using Google Lighthouse and axe-core.
-Website audited: ${website}
-Audit date: ${new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })}
-
-To unsubscribe from future emails, visit: ${unsubLink}
+To opt out of future emails, click here: ${unsubLink}
 `;
 }
 
 function buildHtml(text, unsubLink) {
-  const escaped = text
+  // Render everything except the last unsubscribe line as the main body
+  const lines   = text.split('\n');
+  const mainLines = lines.filter(l => !l.startsWith('To opt out'));
+  const escaped = mainLines.join('\n')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-  return `<html><body>
-<pre style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;white-space:pre-wrap;max-width:600px">${escaped}</pre>
-<p style="margin-top:32px;font-family:Arial,sans-serif;font-size:12px;color:#999999;">
-  If you no longer wish to receive emails from MyWCAG, you can
-  <a href="${unsubLink}" style="color:#2E75B6;">unsubscribe here</a>.
-</p>
+  return `<html><body style="margin:0;padding:0;background:#f4f4f4;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:32px 0;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;padding:40px;font-family:Arial,sans-serif;font-size:15px;line-height:1.7;color:#333333;">
+      <tr><td>
+        <pre style="font-family:Arial,sans-serif;font-size:15px;line-height:1.7;white-space:pre-wrap;margin:0;">${escaped}</pre>
+        <hr style="border:none;border-top:1px solid #eeeeee;margin:32px 0;">
+        <p style="font-size:12px;color:#999999;margin:0;">
+          If you no longer wish to receive emails from us, you can
+          <a href="${unsubLink}" style="color:#2E75B6;text-decoration:underline;">unsubscribe here</a>.
+        </p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
 </body></html>`;
 }
 

@@ -137,12 +137,32 @@ app.post('/api/email/send', async (req, res) => {
     const resend = new Resend(apiKey);
     const from   = process.env.EMAIL_FROM || 'MyWCAG <reports@mywcag.com>';
 
+    const baseUrl   = process.env.BASE_URL || 'https://mywcag-production.up.railway.app';
+    const unsubLink = `${baseUrl}/unsubscribe?email=${encodeURIComponent(toEmail)}`;
+    const fullBody  = body.replace('[recipient-email]', encodeURIComponent(toEmail));
+    const htmlBody  = `<html><body style="margin:0;padding:0;background:#f4f4f4;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:32px 0;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;padding:40px;font-family:Arial,sans-serif;font-size:15px;line-height:1.7;color:#333333;">
+      <tr><td>
+        <pre style="font-family:Arial,sans-serif;font-size:15px;line-height:1.7;white-space:pre-wrap;margin:0;">${fullBody.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>
+        <hr style="border:none;border-top:1px solid #eeeeee;margin:32px 0;">
+        <p style="font-size:12px;color:#999999;margin:0;">
+          If you no longer wish to receive emails from us, you can
+          <a href="${unsubLink}" style="color:#2E75B6;text-decoration:underline;">unsubscribe here</a>.
+        </p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
+
     await resend.emails.send({
       from,
       to:      toEmail,
       subject,
-      text:    body,
-      html:    `<pre style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;white-space:pre-wrap">${body.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</pre>`,
+      text:    fullBody,
+      html:    htmlBody,
       attachments,
     });
 
@@ -543,39 +563,34 @@ function findPdf(name) {
 
 
 function draftSubject(name, score) {
-  return `Website Accessibility Assessment – ${name}`;
+  return `Quick question about your clinic's website`;
 }
 
 function draftBody(name, website, score, violations) {
-  const scoreText = score !== null ? `${score}/100` : 'below the recommended threshold';
-  const auditDate = new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' });
+  const baseUrl   = process.env.BASE_URL || 'https://mywcag-production.up.railway.app';
+  const unsubLink = `${baseUrl}/unsubscribe?email=`;
 
   return `Hello,
 
-As part of a recent accessibility assessment conducted, your website received a WCAG compliance score of ${scoreText} or below, indicating the presence of critical accessibility issues that may impact usability for individuals relying on assistive technologies.
+I'm a fellow clinic owner, and recently I ran a website audit on my own clinic.
 
-Under Canada's ICT Accessibility Standards (CAN/ASC - EN 301 549), which incorporate WCAG 2.1 Level A and AA requirements, digital accessibility is becoming an increasingly important compliance and operational consideration for organizations online.
+To be honest, I was a little shocked by how low our score was. I had no idea things like website usability could affect search rankings or that there were even Canadian requirements around this stuff.
 
-Beyond accessibility compliance, lower WCAG scores can also affect broader digital performance, including:
+It definitely turned into one of those "well… I wish I knew that sooner" moments.
 
-  •  Reduced user experience and usability
-  •  Lower SEO performance and online discoverability
-  •  Potential impacts on search rankings
-  •  Increased bounce rates and reduced engagement
-  •  Elevated regulatory and reputational risk
+Since then, I've been reaching out to other clinic owners just to share what I learned and help raise awareness.
 
-Addressing these issues helps create a more inclusive, user-friendly, and search-optimized experience while strengthening long-term accessibility readiness.
+We started using software that quickly identifies areas that may create barriers for patients online, and I thought it might be helpful for your clinic too.
 
-We recommend reviewing and prioritizing the identified findings as part of your upcoming development cycle. MyWCAG can provide detailed reporting and remediation guidance to support your team.
+If you'd like a free audit of your website, just reply to this email. No strings attached.
 
-For questions or additional information, please contact info@mywcag.com or visit mywcag.com.
+Thanks,
+Mark Bentz
+MyWCAG
+mywcag.com
+info@mywcag.com
 
-Kind regards,
-The MyWCAG Team
-
----
-Website audited: ${website}
-Audit date: ${auditDate}
+To opt out of future emails, click here: ${unsubLink}[recipient-email]
 `;
 }
 
