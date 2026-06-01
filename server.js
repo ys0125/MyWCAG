@@ -8,8 +8,8 @@ const express   = require('express');
 const path      = require('path');
 const fs        = require('fs');
 const puppeteer = require('puppeteer');
-const { Resend }        = require('resend');
-const { upsertContact } = require('./src/hubspot');
+const { Resend }                       = require('resend');
+const { upsertContact, markUnsubscribed } = require('./src/hubspot');
 const unsubscribe       = require('./src/unsubscribe');
 
 const { discoverWebsites } = require('./src/discovery');
@@ -586,6 +586,9 @@ app.get('/unsubscribe', async (req, res) => {
   if (!email) return res.status(400).send('Missing email address.');
 
   unsubscribe.add(email);
+
+  // Mark as unsubscribed in HubSpot CRM (non-blocking)
+  markUnsubscribed(email).catch(() => {});
 
   // Send auto-reply confirmation
   const apiKey = process.env.RESEND_API_KEY;

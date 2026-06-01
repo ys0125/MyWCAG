@@ -71,4 +71,99 @@ async function upsertContact({ email, name, website, phone }) {
   });
 }
 
-module.exports = { upsertContact };
+// Mark a contact as unsubscribed in HubSpot by email address.
+// Searches for the contact first, then patches hs_email_optout = true.
+async function markUnsubscribed(email) {
+  const apiKey = process.env.HUBSPOT_API_KEY;
+  if (!apiKey) {
+    console.warn('⚠  HUBSPOT_API_KEY not set — skipping HubSpot unsubscribe.');
+    return null;
+  }
+
+  // Step 1: find the contact ID by email
+  const contactId = await findContactByEmail(email, apiKey);
+  if (!contactId) {
+    console.log(`📇 HubSpot: no contact found for ${email} — skipping opt-out.`);
+    return null;
+  }
+
+  // Step 2: patch the contact to mark as opted out
+  const payload = JSON.stringify({ properties: { hs_email_optout: true } });
+
+  return new Promise((resolve) => {
+    const req = https.request(
+      {
+        hostname: 'api.hubapi.com',
+        path:     `/crm/v3/objects/contacts/${contactId}`,
+        method:   'PATCH',
+        headers:  {
+          'Content-Type':   'application/json',
+          'Authorization':  `Bearer ${apiKey}`,
+          'Content-Length': Buffer.byteLength(payload),
+        },
+      },
+      (res) => {
+        let body = '';
+        res.on('data', chunk => { body += chunk; });
+        res.on('end', () => {
+          if (res.statusCode === 200) {
+            console.log(`📇 HubSpot: ${email} marked as unsubscribed.`);
+            resolve(true);
+          } else {
+            console.warn(`⚠  HubSpot opt-out failed: ${res.statusCode} — ${body}`);
+            resolve(null);
+          }
+        });
+      }
+    );
+    req.on('error', (err) => {
+      console.warn('⚠  HubSpot opt-out request failed:', err.message);
+      resolve(null);
+    });
+    req.write(payload);
+    req.end();
+  });
+}
+
+function findContactByEmail(email, apiKey) {
+  const payload = JSON.stringify({
+    filterGroups: [{
+      filters: [{ propertyName: 'email', operator: 'EQ', value: email }],
+    }],
+    properties: ['email'],
+    limit: 1,
+  });
+
+  return new Promise((resolve) => {
+    const req = https.request(
+      {
+        hostname: 'api.hubapi.com',
+        path:     '/crm/v3/objects/contacts/search',
+        method:   'POST',
+        headers:  {
+          'Content-Type':   'application/json',
+          'Authorization':  `Bearer ${apiKey}`,
+          'Content-Length': Buffer.byteLength(payload),
+        },
+      },
+      (res) => {
+        let body = '';
+        res.on('data', chunk => { body += chunk; });
+        res.on('end', () => {
+          try {
+            const data = JSON.parse(body);
+            const id   = data.results?.[0]?.id || null;
+            resolve(id);
+          } catch {
+            resolve(null);
+          }
+        });
+      }
+    );
+    req.on('error', () => resolve(null));
+    req.write(payload);
+    req.end();
+  });
+}
+
+module.exports = { upsertContact, markUnsubscribed };
