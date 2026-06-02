@@ -140,29 +140,12 @@ app.post('/api/email/send', async (req, res) => {
     const baseUrl   = process.env.BASE_URL || 'https://mywcag-production.up.railway.app';
     const unsubLink = `${baseUrl}/unsubscribe?email=${encodeURIComponent(toEmail)}`;
     const fullBody  = body.replace('[recipient-email]', encodeURIComponent(toEmail));
-    const htmlBody  = `<html><body style="margin:0;padding:0;background:#f4f4f4;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:32px 0;">
-  <tr><td align="center">
-    <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;padding:40px;font-family:Arial,sans-serif;font-size:15px;line-height:1.7;color:#333333;">
-      <tr><td>
-        <pre style="font-family:Arial,sans-serif;font-size:15px;line-height:1.7;white-space:pre-wrap;margin:0;">${fullBody.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>
-        <hr style="border:none;border-top:1px solid #eeeeee;margin:32px 0;">
-        <p style="font-size:12px;color:#999999;margin:0;">
-          If you no longer wish to receive emails from us, you can
-          <a href="${unsubLink}" style="color:#2E75B6;text-decoration:underline;">unsubscribe here</a>.
-        </p>
-      </td></tr>
-    </table>
-  </td></tr>
-</table>
-</body></html>`;
 
     await resend.emails.send({
       from,
       to:      toEmail,
       subject,
       text:    fullBody,
-      html:    htmlBody,
       attachments,
     });
 
@@ -563,7 +546,7 @@ function findPdf(name) {
 
 
 function draftSubject(name, score) {
-  return `Quick question about your clinic's website`;
+  return `Website Accessibility – ${name}`;
 }
 
 function draftBody(name, website, score, violations) {

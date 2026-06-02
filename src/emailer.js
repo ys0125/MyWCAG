@@ -24,7 +24,6 @@ async function sendReport(business, audit, pdfPath, toEmail) {
     to:      toEmail,
     subject,
     text:    body,
-    html:    buildHtml(body, unsubLink),
     attachments: [
       {
         filename: `${business.name.replace(/[^a-z0-9]/gi, '_')}_accessibility_report.pdf`,
@@ -36,7 +35,7 @@ async function sendReport(business, audit, pdfPath, toEmail) {
 
 
 function buildSubject(business, audit) {
-  return `Quick question about your clinic's website`;
+  return `Website Accessibility – ${business.name}`;
 }
 
 function buildBody(business, audit, unsubLink) {
