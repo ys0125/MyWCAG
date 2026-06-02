@@ -54,7 +54,7 @@ We started using software that quickly identifies areas that may create barriers
 If you'd like a free audit of your website, just reply to this email. No strings attached.
 
 Thanks,
-Mark Bentz
+Mark
 MyWCAG
 mywcag.com
 info@mywcag.com
