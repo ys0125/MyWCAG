@@ -917,7 +917,57 @@ async function sendEmail() {
   if (!res.ok) { toast(data.error || 'Failed to send email.', true); return; }
 
   toast(`✅ Email sent to ${toEmail}`);
+  markLeadAsEmailed(toEmail);
   closeModal();
+}
+
+// Track emailed leads — synced to both localStorage and server
+const emailedSet = new Set(JSON.parse(localStorage.getItem('emailedLeads') || '[]'));
+
+// Load emailed list from server on startup and merge with localStorage
+(async () => {
+  try {
+    const res  = await fetch('/api/emailed');
+    const data = await res.json();
+    if (data.emails) {
+      data.emails.forEach(e => emailedSet.add(e.toLowerCase()));
+      localStorage.setItem('emailedLeads', JSON.stringify([...emailedSet]));
+    }
+  } catch {}
+})();
+
+function markLeadAsEmailed(email) {
+  emailedSet.add(email.toLowerCase());
+  localStorage.setItem('emailedLeads', JSON.stringify([...emailedSet]));
+
+  // Save to server
+  fetch('/api/emailed/add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  }).catch(() => {});
+
+  // Update table buttons
+  document.querySelectorAll('table tbody tr').forEach(row => {
+    const emailCell  = row.cells[2];
+    const actionCell = row.cells[5];
+    if (!emailCell || !actionCell) return;
+    if (emailCell.textContent.trim().toLowerCase() === email.toLowerCase()) {
+      actionCell.innerHTML = '<span style="font-size:12px;color:var(--green,#107C41);font-weight:600">✅ Emailed</span>';
+    }
+  });
+}
+
+function applyEmailedBadges() {
+  if (emailedSet.size === 0) return;
+  document.querySelectorAll('table tbody tr').forEach(row => {
+    const emailCell  = row.cells[2];
+    const actionCell = row.cells[5];
+    if (!emailCell || !actionCell) return;
+    if (emailedSet.has(emailCell.textContent.trim().toLowerCase())) {
+      actionCell.innerHTML = '<span style="font-size:12px;color:var(--green,#107C41);font-weight:600">✅ Emailed</span>';
+    }
+  });
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -1045,6 +1095,7 @@ function renderLeadsTable(leads) {
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
+  applyEmailedBadges();
 }
 
 // Open email modal for a lead (no PDF, no audit score)
@@ -1240,30 +1291,66 @@ async function pollProvince() {
   }
 }
 
+let cachedProvinceLeads = [];
+
 function renderProvinceTable(leads) {
   document.getElementById('provinceResultsCard').style.display = 'block';
   document.getElementById('provinceLeadsCount').textContent    = `(${leads.length} unique leads)`;
 
-  const rows = leads.map(l => {
+  cachedProvinceLeads = leads;
+
+  const rows = leads.map((l, i) => {
     const emailCell = l.email
       ? `<a href="mailto:${esc(l.email)}" style="color:var(--accent)">${esc(l.email)}</a>`
       : '<span style="color:var(--muted)">—</span>';
+    const emailBtn = l.email
+      ? `<button class="btn btn-outline btn-sm" onclick="openProvinceLeadEmail(${i})">📤 Email</button>`
+      : '';
     return `<tr>
       <td><div class="firm-name">${esc(l.name)}</div><div class="firm-url">${esc(l.city)}</div></td>
       <td><a href="${esc(l.website)}" target="_blank" style="font-size:12px;color:var(--accent)">${esc(l.website)}</a></td>
       <td>${emailCell}</td>
       <td style="font-size:12px;color:var(--muted)">${esc(l.phone)}</td>
       <td style="font-size:12px;color:var(--muted)">${esc(l.address)}</td>
+      <td>${emailBtn}</td>
     </tr>`;
   }).join('');
 
   document.getElementById('provinceLeadsTable').innerHTML = `
     <table>
       <thead><tr>
-        <th>Business / City</th><th>Website</th><th>Email</th><th>Phone</th><th>Address</th>
+        <th>Business / City</th><th>Website</th><th>Email</th><th>Phone</th><th>Address</th><th>Action</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
+  applyEmailedBadges();
+}
+
+async function openProvinceLeadEmail(index) {
+  const lead = cachedProvinceLeads[index];
+  if (!lead) return;
+  emailContext = { name: lead.name, url: lead.website, email: lead.email, pdfFile: null, axeViolations: [] };
+
+  const res  = await fetch('/api/email/draft', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: lead.name, website: lead.website, score: null, violations: [] }),
+  });
+  const draft = await res.json();
+
+  document.getElementById('emailTo').value      = lead.email || '';
+  document.getElementById('emailSubject').value = draft.subject;
+  document.getElementById('emailBody').value    = draft.body;
+
+  const attachCheckbox = document.getElementById('attachPdf');
+  const attachNote     = document.getElementById('attachmentNote');
+  const attachSection  = document.getElementById('attachmentSection');
+  attachCheckbox.checked  = false;
+  attachCheckbox.disabled = true;
+  attachNote.textContent  = '📎 No PDF report — lead finder emails are sent without attachments';
+  attachSection.style.opacity = '0.5';
+
+  document.getElementById('emailModal').classList.add('open');
 }
 
 function downloadProvinceCsv() {

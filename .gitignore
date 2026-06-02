@@ -6,4 +6,5 @@ reports/
 *.pdf
 unsubscribed.json
 saved-leads.json
+emailed-leads.json
 .DS_Store

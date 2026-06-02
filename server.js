@@ -578,6 +578,34 @@ To opt out of future emails, click here: ${unsubLink}[recipient-email]
 }
 
 
+// Emailed leads — track which emails have been sent to
+const EMAILED_FILE = path.resolve('./emailed-leads.json');
+
+function loadEmailed() {
+  try {
+    if (fs.existsSync(EMAILED_FILE)) return new Set(JSON.parse(fs.readFileSync(EMAILED_FILE, 'utf8')));
+  } catch {}
+  return new Set();
+}
+
+function saveEmailed(set) {
+  fs.writeFileSync(EMAILED_FILE, JSON.stringify([...set]), 'utf8');
+}
+
+app.get('/api/emailed', (_req, res) => {
+  res.json({ emails: [...loadEmailed()] });
+});
+
+app.post('/api/emailed/add', (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'email required' });
+  const set = loadEmailed();
+  set.add(email.toLowerCase().trim());
+  saveEmailed(set);
+  console.log(`📧 Logged as emailed: ${email}`);
+  res.json({ ok: true });
+});
+
 // Saved leads — persist lead finder results across sessions
 const SAVED_LEADS_FILE = path.resolve('./saved-leads.json');
 
