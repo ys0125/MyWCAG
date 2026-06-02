@@ -1005,19 +1005,23 @@ async function pollLeads() {
   }
 }
 
+let cachedLeads = [];
+
 function renderLeadsTable(leads) {
   document.getElementById('leadsResultsCard').style.display = 'block';
   document.getElementById('leadsCount').textContent = `(${leads.length} found)`;
 
+  cachedLeads = leads;
+
   // Auto-save leads to server
   saveleadsToServer(leads);
 
-  const rows = leads.map(l => {
+  const rows = leads.map((l, i) => {
     const emailCell = l.email
       ? `<a href="mailto:${esc(l.email)}" style="color:var(--accent)">${esc(l.email)}</a>`
       : '<span style="color:var(--muted)">—</span>';
     const emailBtn = l.email
-      ? `<button class="btn btn-outline btn-sm" onclick='openLeadEmail(${JSON.stringify(l)})'>📤 Email</button>`
+      ? `<button class="btn btn-outline btn-sm" onclick="openLeadEmail(${i})">📤 Email</button>`
       : '';
     return `<tr>
       <td><div class="firm-name">${esc(l.name)}</div></td>
@@ -1044,7 +1048,9 @@ function renderLeadsTable(leads) {
 }
 
 // Open email modal for a lead (no PDF, no audit score)
-async function openLeadEmail(lead) {
+async function openLeadEmail(index) {
+  const lead = cachedLeads[index];
+  if (!lead) return;
   emailContext = { name: lead.name, url: lead.website, email: lead.email, pdfFile: null, axeViolations: [] };
 
   const res  = await fetch('/api/email/draft', {
@@ -1267,13 +1273,13 @@ function downloadProvinceCsv() {
 // Load provinces on startup
 loadProvinces();
 
-// Show saved leads button on startup if saved leads exist
+// Auto-load saved leads on startup
 (async () => {
   try {
     const res  = await fetch('/api/leads/saved');
     const data = await res.json();
     if (data.leads && data.leads.length > 0) {
-      document.getElementById('leadsResultsCard').style.display = 'block';
+      renderLeadsTable(data.leads);
       document.getElementById('leadsCount').textContent = `(${data.leads.length} saved)`;
     }
   } catch {}
