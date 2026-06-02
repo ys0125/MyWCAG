@@ -5,4 +5,5 @@ leads-cache.json
 reports/
 *.pdf
 unsubscribed.json
+saved-leads.json
 .DS_Store

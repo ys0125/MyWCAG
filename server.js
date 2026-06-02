@@ -578,6 +578,32 @@ To opt out of future emails, click here: ${unsubLink}[recipient-email]
 }
 
 
+// Saved leads — persist lead finder results across sessions
+const SAVED_LEADS_FILE = path.resolve('./saved-leads.json');
+
+app.get('/api/leads/saved', (_req, res) => {
+  try {
+    if (fs.existsSync(SAVED_LEADS_FILE)) {
+      const leads = JSON.parse(fs.readFileSync(SAVED_LEADS_FILE, 'utf8'));
+      return res.json({ leads });
+    }
+    res.json({ leads: [] });
+  } catch {
+    res.json({ leads: [] });
+  }
+});
+
+app.post('/api/leads/saved/save', (req, res) => {
+  try {
+    const { leads } = req.body;
+    if (!Array.isArray(leads)) return res.status(400).json({ error: 'leads must be an array' });
+    fs.writeFileSync(SAVED_LEADS_FILE, JSON.stringify(leads, null, 2), 'utf8');
+    res.json({ ok: true, count: leads.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Unsubscribe endpoint — sends auto-reply and saves email to unsubscribed list
 app.get('/unsubscribe', async (req, res) => {
   const email = (req.query.email || '').toLowerCase().trim();
