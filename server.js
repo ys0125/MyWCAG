@@ -8,8 +8,8 @@ const express   = require('express');
 const path      = require('path');
 const fs        = require('fs');
 const puppeteer = require('puppeteer');
-const { Resend }                       = require('resend');
-const { upsertContact, markUnsubscribed } = require('./src/hubspot');
+const { Resend }                                          = require('resend');
+const { upsertContact, markUnsubscribed, logEmailEngagement } = require('./src/hubspot');
 const unsubscribe       = require('./src/unsubscribe');
 
 const { discoverWebsites } = require('./src/discovery');
@@ -155,6 +155,13 @@ app.post('/api/email/send', async (req, res) => {
       name:    bizName    || '',
       website: bizWebsite || '',
       phone:   bizPhone   || '',
+    }).catch(() => {});
+
+    // Log the email engagement on the contact's HubSpot timeline
+    logEmailEngagement({
+      email:   toEmail,
+      subject,
+      body:    fullBody,
     }).catch(() => {});
 
     res.json({ ok: true });
@@ -675,9 +682,9 @@ app.get('/unsubscribe', async (req, res) => {
   `);
 });
 
-// Check if an email is unsubscribed before sending
+// Full unsubscribed list with dates
 app.get('/api/unsubscribed', (_req, res) => {
-  res.json({ emails: unsubscribe.getAll() });
+  res.json({ list: unsubscribe.getAll() });
 });
 
 app.listen(PORT, () => {

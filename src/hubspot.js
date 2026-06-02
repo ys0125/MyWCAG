@@ -166,4 +166,68 @@ function findContactByEmail(email, apiKey) {
   });
 }
 
-module.exports = { upsertContact, markUnsubscribed };
+// Log an email engagement on a HubSpot contact's timeline
+async function logEmailEngagement({ email, subject, body }) {
+  const apiKey = process.env.HUBSPOT_API_KEY;
+  if (!apiKey) return null;
+
+  // Find contact ID first
+  const contactId = await findContactByEmail(email, apiKey);
+  if (!contactId) {
+    console.log(`📇 HubSpot: no contact found for ${email} — skipping engagement log.`);
+    return null;
+  }
+
+  const payload = JSON.stringify({
+    engagement: {
+      active:    true,
+      type:      'EMAIL',
+      timestamp: Date.now(),
+    },
+    associations: {
+      contactIds: [parseInt(contactId)],
+    },
+    metadata: {
+      from:    { email: process.env.EMAIL_FROM || 'info@mywcag.com' },
+      to:      [{ email }],
+      subject,
+      text:    body,
+    },
+  });
+
+  return new Promise((resolve) => {
+    const req = https.request(
+      {
+        hostname: 'api.hubapi.com',
+        path:     '/engagements/v1/engagements',
+        method:   'POST',
+        headers:  {
+          'Content-Type':   'application/json',
+          'Authorization':  `Bearer ${apiKey}`,
+          'Content-Length': Buffer.byteLength(payload),
+        },
+      },
+      (res) => {
+        let body = '';
+        res.on('data', chunk => { body += chunk; });
+        res.on('end', () => {
+          if (res.statusCode === 200 || res.statusCode === 201) {
+            console.log(`📇 HubSpot: email engagement logged for ${email}`);
+            resolve(true);
+          } else {
+            console.warn(`⚠  HubSpot engagement failed: ${res.statusCode} — ${body}`);
+            resolve(null);
+          }
+        });
+      }
+    );
+    req.on('error', (err) => {
+      console.warn('⚠  HubSpot engagement request failed:', err.message);
+      resolve(null);
+    });
+    req.write(payload);
+    req.end();
+  });
+}
+
+module.exports = { upsertContact, markUnsubscribed, logEmailEngagement };
