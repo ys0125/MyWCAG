@@ -167,39 +167,40 @@ function findContactByEmail(email, apiKey) {
 }
 
 // Log an email engagement on a HubSpot contact's timeline
+// Uses the modern CRM v3 emails API so it appears in the contact's Activity feed.
 async function logEmailEngagement({ email, subject, body }) {
   const apiKey = process.env.HUBSPOT_API_KEY;
   if (!apiKey) return null;
 
-  // Find contact ID first
+  // Step 1: find the contact ID
   const contactId = await findContactByEmail(email, apiKey);
   if (!contactId) {
     console.log(`📇 HubSpot: no contact found for ${email} — skipping engagement log.`);
     return null;
   }
 
+  const fromEmail = (process.env.EMAIL_FROM || 'info@mywcag.com').replace(/.*<(.+)>/, '$1').trim();
+
+  // Step 2: create the email object via CRM v3
   const payload = JSON.stringify({
-    engagement: {
-      active:    true,
-      type:      'EMAIL',
-      timestamp: Date.now(),
-    },
-    associations: {
-      contactIds: [parseInt(contactId)],
-    },
-    metadata: {
-      from:    { email: process.env.EMAIL_FROM || 'info@mywcag.com' },
-      to:      [{ email }],
-      subject,
-      text:    body,
+    properties: {
+      hs_timestamp:          Date.now().toString(),
+      hubspot_owner_id:      '',
+      hs_email_direction:    'EMAIL',
+      hs_email_status:       'SENT',
+      hs_email_subject:      subject,
+      hs_email_text:         body,
+      hs_email_from_email:   fromEmail,
+      hs_email_from_firstname: 'MyWCAG',
+      hs_email_to_email:     email,
     },
   });
 
-  return new Promise((resolve) => {
+  const emailId = await new Promise((resolve) => {
     const req = https.request(
       {
         hostname: 'api.hubapi.com',
-        path:     '/engagements/v1/engagements',
+        path:     '/crm/v3/objects/emails',
         method:   'POST',
         headers:  {
           'Content-Type':   'application/json',
@@ -208,24 +209,64 @@ async function logEmailEngagement({ email, subject, body }) {
         },
       },
       (res) => {
-        let body = '';
-        res.on('data', chunk => { body += chunk; });
+        let data = '';
+        res.on('data', chunk => { data += chunk; });
         res.on('end', () => {
-          if (res.statusCode === 200 || res.statusCode === 201) {
-            console.log(`📇 HubSpot: email engagement logged for ${email}`);
-            resolve(true);
+          if (res.statusCode === 201) {
+            const parsed = JSON.parse(data);
+            console.log(`📇 HubSpot: email object created — id ${parsed.id} for ${email}`);
+            resolve(parsed.id);
           } else {
-            console.warn(`⚠  HubSpot engagement failed: ${res.statusCode} — ${body}`);
+            console.warn(`⚠  HubSpot email create failed: ${res.statusCode} — ${data}`);
             resolve(null);
           }
         });
       }
     );
-    req.on('error', (err) => {
-      console.warn('⚠  HubSpot engagement request failed:', err.message);
-      resolve(null);
-    });
+    req.on('error', (err) => { console.warn('⚠  HubSpot email create error:', err.message); resolve(null); });
     req.write(payload);
+    req.end();
+  });
+
+  if (!emailId) return null;
+
+  // Step 3: associate the email object with the contact
+  const assocPayload = JSON.stringify({
+    inputs: [{
+      from: { id: emailId },
+      to:   { id: contactId },
+      type: 'email_to_contact',
+    }],
+  });
+
+  return new Promise((resolve) => {
+    const req = https.request(
+      {
+        hostname: 'api.hubapi.com',
+        path:     '/crm/v3/associations/emails/contacts/batch/create',
+        method:   'POST',
+        headers:  {
+          'Content-Type':   'application/json',
+          'Authorization':  `Bearer ${apiKey}`,
+          'Content-Length': Buffer.byteLength(assocPayload),
+        },
+      },
+      (res) => {
+        let data = '';
+        res.on('data', chunk => { data += chunk; });
+        res.on('end', () => {
+          if (res.statusCode === 200 || res.statusCode === 201) {
+            console.log(`📇 HubSpot: email associated with contact ${contactId} for ${email}`);
+            resolve(true);
+          } else {
+            console.warn(`⚠  HubSpot association failed: ${res.statusCode} — ${data}`);
+            resolve(null);
+          }
+        });
+      }
+    );
+    req.on('error', (err) => { console.warn('⚠  HubSpot association error:', err.message); resolve(null); });
+    req.write(assocPayload);
     req.end();
   });
 }
